@@ -1,6 +1,8 @@
+
 import { useEffect, useMemo, useState } from "react";
 import { Bar, Doughnut } from "react-chartjs-2";
 import "./style.css";
+
 import {
   Chart as ChartJS,
   ArcElement,
@@ -11,7 +13,6 @@ import {
   BarElement,
   Title
 } from "chart.js";
-import "./style.css";
 
 ChartJS.register(
   ArcElement,
@@ -46,6 +47,19 @@ const emptyForm = () => ({
   recurring: false
 });
 
+const chartColors = [
+  "#6366f1",
+  "#06b6d4",
+  "#f59e0b",
+  "#ef4444",
+  "#10b981",
+  "#8b5cf6",
+  "#ec4899",
+  "#14b8a6",
+  "#f97316",
+  "#64748b"
+];
+
 export default function ExpenseDashboard() {
   const [transactions, setTransactions] = useState(() =>
     JSON.parse(localStorage.getItem("transactions") || "[]")
@@ -73,7 +87,6 @@ export default function ExpenseDashboard() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [budgetInput, setBudgetInput] = useState(String(budget));
 
-  // Save data in local storage
   useEffect(() => {
     localStorage.setItem("transactions", JSON.stringify(transactions));
   }, [transactions]);
@@ -92,7 +105,6 @@ export default function ExpenseDashboard() {
     document.body.classList.toggle("dark", dark);
   }, [dark]);
 
-  // Calculate income, expenses and balance
   const income = transactions
     .filter((t) => t.type === "income")
     .reduce((sum, t) => sum + Number(t.amount), 0);
@@ -111,7 +123,6 @@ export default function ExpenseDashboard() {
   const progress =
     budget > 0 ? Math.min(100, (expense / budget) * 100) : 0;
 
-  // Search and filter transactions
   const filtered = useMemo(
     () =>
       transactions
@@ -131,7 +142,6 @@ export default function ExpenseDashboard() {
     .sort((a, b) => new Date(b.date) - new Date(a.date))
     .slice(0, 5);
 
-  // Category-wise expense calculation
   const categoryTotals = {};
 
   transactions
@@ -141,34 +151,29 @@ export default function ExpenseDashboard() {
         (categoryTotals[t.category] || 0) + Number(t.amount);
     });
 
-  // Monthly income and expense calculation
   const monthly = {};
 
   transactions.forEach((t) => {
     const key = t.date.slice(0, 7);
 
     monthly[key] ||= { income: 0, expense: 0 };
-
     monthly[key][t.type] += Number(t.amount);
   });
 
   const months = Object.keys(monthly).sort();
 
-  // Open add transaction form
   function openAdd() {
     setEditingId(null);
     setForm(emptyForm());
     setModal(true);
   }
 
-  // Open edit transaction form
   function openEdit(t) {
     setEditingId(t.id);
     setForm({ ...t, amount: String(t.amount) });
     setModal(true);
   }
 
-  // Save transaction
   function saveTransaction(e) {
     e.preventDefault();
 
@@ -190,14 +195,12 @@ export default function ExpenseDashboard() {
     setModal(false);
   }
 
-  // Delete transaction
   function deleteTransaction(id) {
     if (window.confirm("Delete this transaction?")) {
       setTransactions((old) => old.filter((t) => t.id !== id));
     }
   }
 
-  // Add account
   function addAccount() {
     const name = window.prompt("Enter account name:");
 
@@ -215,7 +218,6 @@ export default function ExpenseDashboard() {
     ]);
   }
 
-  // Export transactions as CSV
   function exportCSV() {
     if (!transactions.length) {
       alert("No transactions to export.");
@@ -223,15 +225,7 @@ export default function ExpenseDashboard() {
     }
 
     const rows = [
-      [
-        "Date",
-        "Description",
-        "Category",
-        "Account",
-        "Type",
-        "Amount",
-        "Recurring"
-      ],
+      ["Date", "Description", "Category", "Account", "Type", "Amount", "Recurring"],
       ...transactions.map((t) => [
         t.date,
         t.description,
@@ -245,9 +239,7 @@ export default function ExpenseDashboard() {
 
     const csv = rows
       .map((row) =>
-        row
-          .map((v) => `"${String(v).replaceAll('"', '""')}"`)
-          .join(",")
+        row.map((v) => `"${String(v).replaceAll('"', '""')}"`).join(",")
       )
       .join("\n");
 
@@ -259,16 +251,12 @@ export default function ExpenseDashboard() {
     a.href = url;
     a.download = "expense-transactions.csv";
     a.click();
-
     URL.revokeObjectURL(url);
   }
 
-  // Reset application data
   function resetData() {
     if (
-      confirm(
-        "This will delete all transactions, accounts and budget. Continue?"
-      )
+      confirm("This will delete all transactions, accounts and budget. Continue?")
     ) {
       setTransactions([]);
       setAccounts(initialAccounts);
@@ -294,15 +282,11 @@ export default function ExpenseDashboard() {
 
   return (
     <div className="app">
-      {/* Sidebar */}
       <aside className="sidebar">
         <div className="logo">
           <div className="logo-icon">₹</div>
-
           <div>
-            <h2>
-              Expense<span>Track</span>
-            </h2>
+            <h2>Expense<span>Track</span></h2>
             <small>Finance Manager</small>
           </div>
         </div>
@@ -311,9 +295,7 @@ export default function ExpenseDashboard() {
           {nav.map(([key, label]) => (
             <button
               key={key}
-              className={`nav-item ${
-                section === key ? "active" : ""
-              }`}
+              className={`nav-item ${section === key ? "active" : ""}`}
               onClick={() => setSection(key)}
             >
               {label}
@@ -325,57 +307,29 @@ export default function ExpenseDashboard() {
           <button onClick={() => setDark((v) => !v)}>
             {dark ? "☀️" : "🌙"} Toggle Theme
           </button>
-
           <button onClick={exportCSV}>📥 Export CSV</button>
-
           <button onClick={resetData}>⚠ Reset Data</button>
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="main">
         <header className="header">
           <div>
             <h1>{titles[section]}</h1>
             <p>Manage your finances smartly and efficiently.</p>
           </div>
-
           <button className="add-btn" onClick={openAdd}>
             + Add Transaction
           </button>
         </header>
 
-        {/* Dashboard */}
         {section === "dashboard" && (
           <>
             <div className="summary-grid">
-              <Summary
-                title="Total Income"
-                value={money(income)}
-                icon="💰"
-                kind="income"
-              />
-
-              <Summary
-                title="Total Expenses"
-                value={money(expense)}
-                icon="💸"
-                kind="expense"
-              />
-
-              <Summary
-                title="Balance"
-                value={money(balance)}
-                icon="💳"
-                kind="balance"
-              />
-
-              <Summary
-                title="Savings Rate"
-                value={`${savingRate.toFixed(1)}%`}
-                icon="🎯"
-                kind="saving"
-              />
+              <Summary title="Total Income" value={money(income)} icon="💰" kind="income" />
+              <Summary title="Total Expenses" value={money(expense)} icon="💸" kind="expense" />
+              <Summary title="Balance" value={money(balance)} icon="💳" kind="balance" />
+              <Summary title="Savings Rate" value={`${savingRate.toFixed(1)}%`} icon="🎯" kind="saving" />
             </div>
 
             <div className="dashboard-grid">
@@ -392,23 +346,36 @@ export default function ExpenseDashboard() {
                     <Doughnut
                       data={{
                         labels: Object.keys(categoryTotals),
-                        datasets: [
-                          {
-                            data: Object.values(categoryTotals)
-                          }
-                        ]
+                        datasets: [{
+                          label: "Expenses",
+                          data: Object.values(categoryTotals),
+                          backgroundColor: chartColors,
+                          borderColor: dark ? "#1e293b" : "#ffffff",
+                          borderWidth: 3,
+                          hoverOffset: 12
+                        }]
                       }}
                       options={{
                         responsive: true,
                         maintainAspectRatio: false,
                         plugins: {
-                          legend: { position: "bottom" }
+                          legend: {
+                            position: "bottom",
+                            labels: {
+                              padding: 20,
+                              usePointStyle: true
+                            }
+                          },
+                          tooltip: {
+                            callbacks: {
+                              label: (context) =>
+                                `${context.label}: ${money(context.raw)}`
+                            }
+                          }
                         }
                       }}
                     />
-                  ) : (
-                    <Empty>No expense data yet.</Empty>
-                  )}
+                  ) : <Empty>No expense data yet.</Empty>}
                 </div>
               </div>
 
@@ -427,10 +394,7 @@ export default function ExpenseDashboard() {
                   progress={progress}
                 />
 
-                <button
-                  className="secondary-btn"
-                  onClick={() => setSection("budget")}
-                >
+                <button className="secondary-btn" onClick={() => setSection("budget")}>
                   Manage Budget
                 </button>
               </div>
@@ -442,27 +406,18 @@ export default function ExpenseDashboard() {
                   <h3>Recent Transactions</h3>
                   <p>Your latest financial activities</p>
                 </div>
-
-                <button
-                  className="text-btn"
-                  onClick={() => setSection("transactions")}
-                >
+                <button className="text-btn" onClick={() => setSection("transactions")}>
                   View All
                 </button>
               </div>
 
-              {recent.length ? (
-                recent.map((t) => (
-                  <TransactionRow key={t.id} item={t} />
-                ))
-              ) : (
-                <Empty>No transactions yet.</Empty>
-              )}
+              {recent.length ? recent.map((t) => (
+                <TransactionRow key={t.id} item={t} />
+              )) : <Empty>No transactions yet.</Empty>}
             </div>
           </>
         )}
 
-        {/* Transactions */}
         {section === "transactions" && (
           <div className="panel">
             <div className="filter-bar">
@@ -472,24 +427,15 @@ export default function ExpenseDashboard() {
                 onChange={(e) => setSearch(e.target.value)}
               />
 
-              <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-              >
+              <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
                 <option value="all">All Types</option>
                 <option value="income">Income</option>
                 <option value="expense">Expense</option>
               </select>
 
-              <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-              >
+              <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
                 <option value="all">All Categories</option>
-
-                {categories.map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
+                {categories.map((c) => <option key={c}>{c}</option>)}
               </select>
             </div>
 
@@ -497,70 +443,31 @@ export default function ExpenseDashboard() {
               <table>
                 <thead>
                   <tr>
-                    <th>Date</th>
-                    <th>Description</th>
-                    <th>Category</th>
-                    <th>Account</th>
-                    <th>Type</th>
-                    <th>Amount</th>
-                    <th>Action</th>
+                    <th>Date</th><th>Description</th><th>Category</th>
+                    <th>Account</th><th>Type</th><th>Amount</th><th>Action</th>
                   </tr>
                 </thead>
-
                 <tbody>
-                  {filtered.length ? (
-                    filtered.map((t) => (
-                      <tr key={t.id}>
-                        <td>{t.date}</td>
-
-                        <td>
-                          <strong>{t.description}</strong>
-                          {t.recurring && <small> 🔁 Recurring</small>}
-                        </td>
-
-                        <td>
-                          <span className="category-tag">
-                            {t.category}
-                          </span>
-                        </td>
-
-                        <td>{t.account}</td>
-                        <td>{t.type}</td>
-
-                        <td
-                          className={
-                            t.type === "income"
-                              ? "income-text"
-                              : "expense-text"
-                          }
-                        >
-                          {t.type === "income" ? "+" : "-"}
-                          {money(t.amount)}
-                        </td>
-
-                        <td>
-                          <button
-                            className="action-btn"
-                            onClick={() => openEdit(t)}
-                          >
-                            ✏️
-                          </button>
-
-                          <button
-                            className="action-btn"
-                            onClick={() => deleteTransaction(t.id)}
-                          >
-                            🗑️
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="7">
-                        <Empty>No transactions found.</Empty>
+                  {filtered.length ? filtered.map((t) => (
+                    <tr key={t.id}>
+                      <td>{t.date}</td>
+                      <td>
+                        <strong>{t.description}</strong>
+                        {t.recurring && <small> 🔁 Recurring</small>}
+                      </td>
+                      <td><span className="category-tag">{t.category}</span></td>
+                      <td>{t.account}</td>
+                      <td>{t.type}</td>
+                      <td className={t.type === "income" ? "income-text" : "expense-text"}>
+                        {t.type === "income" ? "+" : "-"}{money(t.amount)}
+                      </td>
+                      <td>
+                        <button className="action-btn" onClick={() => openEdit(t)}>✏️</button>
+                        <button className="action-btn" onClick={() => deleteTransaction(t.id)}>🗑️</button>
                       </td>
                     </tr>
+                  )) : (
+                    <tr><td colSpan="7"><Empty>No transactions found.</Empty></td></tr>
                   )}
                 </tbody>
               </table>
@@ -568,16 +475,13 @@ export default function ExpenseDashboard() {
           </div>
         )}
 
-        {/* Budget */}
         {section === "budget" && (
           <div className="budget-layout">
             <div className="panel">
               <h3>Monthly Budget</h3>
               <p>Set your spending limit for the month.</p>
-
               <div className="form-group">
                 <label>Budget Amount</label>
-
                 <input
                   type="number"
                   min="0"
@@ -586,40 +490,24 @@ export default function ExpenseDashboard() {
                   onChange={(e) => setBudgetInput(e.target.value)}
                 />
               </div>
-
-              <button
-                className="add-btn"
-                onClick={() => {
-                  const n = Number(budgetInput);
-
-                  if (n < 0) {
-                    return alert("Budget cannot be negative.");
-                  }
-
-                  setBudget(n);
-                  alert("Budget saved successfully.");
-                }}
-              >
+              <button className="add-btn" onClick={() => {
+                const n = Number(budgetInput);
+                if (!Number.isFinite(n) || n < 0) return alert("Enter a valid budget.");
+                setBudget(n);
+                alert("Budget saved successfully.");
+              }}>
                 Save Budget
               </button>
             </div>
 
             <div className="panel">
               <h3>Budget Status</h3>
-
               <div className="big-number">{money(budget)}</div>
-
-              <BudgetProgress
-                budget={budget}
-                expense={expense}
-                remaining={remaining}
-                progress={progress}
-              />
+              <BudgetProgress budget={budget} expense={expense} remaining={remaining} progress={progress} />
             </div>
           </div>
         )}
 
-        {/* Accounts */}
         {section === "accounts" && (
           <div className="panel">
             <div className="panel-header">
@@ -627,31 +515,20 @@ export default function ExpenseDashboard() {
                 <h3>Accounts</h3>
                 <p>Track money across multiple accounts.</p>
               </div>
-
-              <button className="add-btn" onClick={addAccount}>
-                + Add Account
-              </button>
+              <button className="add-btn" onClick={addAccount}>+ Add Account</button>
             </div>
 
             <div className="accounts-grid">
               {accounts.map((a) => {
                 const total = transactions
                   .filter((t) => t.account === a.name)
-                  .reduce(
-                    (s, t) =>
-                      s +
-                      (t.type === "income" ? 1 : -1) *
-                        Number(t.amount),
-                    0
-                  );
+                  .reduce((s, t) => s + (t.type === "income" ? 1 : -1) * Number(t.amount), 0);
 
                 return (
                   <div className="account-card" key={a.id}>
                     <h4>{a.name}</h4>
                     <p>{a.type}</p>
-                    <div className="account-balance">
-                      {money(total)}
-                    </div>
+                    <div className="account-balance">{money(total)}</div>
                   </div>
                 );
               })}
@@ -659,7 +536,6 @@ export default function ExpenseDashboard() {
           </div>
         )}
 
-        {/* Reports */}
         {section === "reports" && (
           <div className="panel">
             <div className="panel-header">
@@ -677,11 +553,19 @@ export default function ExpenseDashboard() {
                     datasets: [
                       {
                         label: "Income",
-                        data: months.map((m) => monthly[m].income)
+                        data: months.map((m) => monthly[m].income),
+                        backgroundColor: "#10b981",
+                        borderColor: "#059669",
+                        borderWidth: 1,
+                        borderRadius: 6
                       },
                       {
                         label: "Expenses",
-                        data: months.map((m) => monthly[m].expense)
+                        data: months.map((m) => monthly[m].expense),
+                        backgroundColor: "#ef4444",
+                        borderColor: "#dc2626",
+                        borderWidth: 1,
+                        borderRadius: 6
                       }
                     ]
                   }}
@@ -689,52 +573,47 @@ export default function ExpenseDashboard() {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                      legend: { position: "bottom" }
+                      legend: {
+                        position: "bottom",
+                        labels: { usePointStyle: true, padding: 20 }
+                      },
+                      tooltip: {
+                        callbacks: {
+                          label: (context) =>
+                            `${context.dataset.label}: ${money(context.raw)}`
+                        }
+                      }
+                    },
+                    scales: {
+                      y: {
+                        beginAtZero: true,
+                        ticks: {
+                          callback: (value) => "₹" + value
+                        }
+                      }
                     }
                   }}
                 />
-              ) : (
-                <Empty>No report data yet.</Empty>
-              )}
+              ) : <Empty>No report data yet.</Empty>}
             </div>
           </div>
         )}
       </main>
 
-      {/* Add / Edit Transaction Modal */}
       {modal && (
-        <div
-          className="modal show"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) {
-              setModal(false);
-            }
-          }}
-        >
+        <div className="modal show" onMouseDown={(e) => {
+          if (e.target === e.currentTarget) setModal(false);
+        }}>
           <div className="modal-content">
             <div className="modal-header">
-              <h2>
-                {editingId ? "Edit Transaction" : "Add Transaction"}
-              </h2>
-
-              <button
-                className="close-btn"
-                onClick={() => setModal(false)}
-              >
-                ×
-              </button>
+              <h2>{editingId ? "Edit Transaction" : "Add Transaction"}</h2>
+              <button className="close-btn" onClick={() => setModal(false)}>×</button>
             </div>
 
             <form onSubmit={saveTransaction}>
               <div className="form-group">
                 <label>Transaction Type</label>
-
-                <select
-                  value={form.type}
-                  onChange={(e) =>
-                    setForm({ ...form, type: e.target.value })
-                  }
-                >
+                <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
                   <option value="expense">Expense</option>
                   <option value="income">Income</option>
                 </select>
@@ -742,121 +621,49 @@ export default function ExpenseDashboard() {
 
               <div className="form-group">
                 <label>Description</label>
-
-                <input
-                  required
-                  value={form.description}
-                  placeholder="e.g. Grocery shopping"
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      description: e.target.value
-                    })
-                  }
-                />
+                <input required value={form.description} placeholder="e.g. Grocery shopping"
+                  onChange={(e) => setForm({ ...form, description: e.target.value })} />
               </div>
 
               <div className="form-row">
                 <div className="form-group">
                   <label>Amount</label>
-
-                  <input
-                    required
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    value={form.amount}
-                    onChange={(e) =>
-                      setForm({ ...form, amount: e.target.value })
-                    }
-                  />
+                  <input required type="number" min="0.01" step="0.01"
+                    value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
                 </div>
-
                 <div className="form-group">
                   <label>Date</label>
-
-                  <input
-                    required
-                    type="date"
-                    value={form.date}
-                    onChange={(e) =>
-                      setForm({ ...form, date: e.target.value })
-                    }
-                  />
+                  <input required type="date" value={form.date}
+                    onChange={(e) => setForm({ ...form, date: e.target.value })} />
                 </div>
               </div>
 
               <div className="form-row">
                 <div className="form-group">
                   <label>Category</label>
-
-                  <select
-                    value={form.category}
-                    onChange={(e) =>
-                      setForm({ ...form, category: e.target.value })
-                    }
-                  >
-                    {[
-                      "Food",
-                      "Transport",
-                      "Shopping",
-                      "Bills",
-                      "Entertainment",
-                      "Health",
-                      "Education",
-                      "Salary",
-                      "Freelance",
-                      "Investment",
-                      "Other"
-                    ].map((c) => (
+                  <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+                    {["Food", "Transport", "Shopping", "Bills", "Entertainment", "Health", "Education", "Salary", "Freelance", "Investment", "Other"].map((c) => (
                       <option key={c}>{c}</option>
                     ))}
                   </select>
                 </div>
-
                 <div className="form-group">
                   <label>Account</label>
-
-                  <select
-                    value={form.account}
-                    onChange={(e) =>
-                      setForm({ ...form, account: e.target.value })
-                    }
-                  >
-                    {accounts.map((a) => (
-                      <option key={a.id}>{a.name}</option>
-                    ))}
+                  <select value={form.account} onChange={(e) => setForm({ ...form, account: e.target.value })}>
+                    {accounts.map((a) => <option key={a.id}>{a.name}</option>)}
                   </select>
                 </div>
               </div>
 
               <div className="form-group checkbox-group">
-                <input
-                  type="checkbox"
-                  checked={form.recurring}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      recurring: e.target.checked
-                    })
-                  }
-                />
-
+                <input type="checkbox" checked={form.recurring}
+                  onChange={(e) => setForm({ ...form, recurring: e.target.checked })} />
                 <label>Recurring transaction</label>
               </div>
 
               <div className="modal-actions">
-                <button
-                  type="button"
-                  className="secondary-btn"
-                  onClick={() => setModal(false)}
-                >
-                  Cancel
-                </button>
-
-                <button type="submit" className="add-btn">
-                  Save Transaction
-                </button>
+                <button type="button" className="secondary-btn" onClick={() => setModal(false)}>Cancel</button>
+                <button type="submit" className="add-btn">Save Transaction</button>
               </div>
             </form>
           </div>
@@ -870,70 +677,47 @@ export default function ExpenseDashboard() {
   );
 }
 
-// Summary card component
 function Summary({ title, value, icon, kind }) {
   return (
     <div className={`summary-card ${kind}`}>
-      <div>
-        <p>{title}</p>
-        <h2>{value}</h2>
-      </div>
-
+      <div><p>{title}</p><h2>{value}</h2></div>
       <div className="card-icon">{icon}</div>
     </div>
   );
 }
 
-// Empty message component
 function Empty({ children }) {
   return <div className="empty">{children}</div>;
 }
 
-// Transaction row component
 function TransactionRow({ item: t }) {
   return (
     <div className="transaction-row">
       <div>
         <strong>{t.description}</strong>
-        <small>
-          {t.date} • {t.category}
-        </small>
+        <small>{t.date} • {t.category}</small>
       </div>
-
-      <strong
-        className={
-          t.type === "income" ? "income-text" : "expense-text"
-        }
-      >
-        {t.type === "income" ? "+" : "-"}
-        {money(t.amount)}
+      <strong className={t.type === "income" ? "income-text" : "expense-text"}>
+        {t.type === "income" ? "+" : "-"}{money(t.amount)}
       </strong>
     </div>
   );
 }
 
-// Budget progress component
-function BudgetProgress({
-  budget,
-  expense,
-  remaining,
-  progress
-}) {
+function BudgetProgress({ budget, expense, remaining, progress }) {
   return (
     <div className="budget-box">
       <div className="budget-top">
         <span>Monthly Budget</span>
         <strong>{money(budget)}</strong>
       </div>
-
       <div className="progress">
         <div style={{ width: `${progress}%` }} />
       </div>
-
       <div className="budget-info">
         <span>Spent: {money(expense)}</span>
         <span>Remaining: {money(remaining)}</span>
       </div>
     </div>
   );
-} 
+}

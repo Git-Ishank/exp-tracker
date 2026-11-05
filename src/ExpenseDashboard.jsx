@@ -671,7 +671,7 @@ export default function ExpenseDashboard() {
       )}
 
       <div className="developer-tag">
-        Designed and Developed by <strong>Harshal Balla</strong>
+        Designed and Developed by <strong>Harshal Balla and Team</strong>
       </div>
     </div>
   );

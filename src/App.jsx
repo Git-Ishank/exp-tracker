@@ -1,973 +1,1065 @@
-        import Login from "./components/login";
+
+import Login from "./components/login";
 import "./components/Auth.css";
-      import { useEffect, useMemo, useState } from "react";
-      import { Bar, Doughnut } from "react-chartjs-2";
-      import "./style.css";
-      
-      import {
-        Chart as ChartJS,
-        ArcElement,
-        Tooltip,
-        Legend,
-        CategoryScale,
-        LinearScale,
-        BarElement,
-        Title
-      } from "chart.js";
-      import "./style.css";
+import { useEffect, useMemo, useState } from "react";
+import { Bar, Doughnut } from "react-chartjs-2";
+import "./style.css";
 
-      ChartJS.register(
-        ArcElement,
-        Tooltip,
-        Legend,
-        CategoryScale,
-        LinearScale,
-        BarElement,
-        Title
-      );
+import {
+  Chart as ChartJS,
+  ArcElement,
+  Tooltip,
+  Legend,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title
+} from "chart.js";
 
-      const money = (value) =>
-        new Intl.NumberFormat("en-IN", {
-          style: "currency",
-          currency: "INR",
-          maximumFractionDigits: 2
-        }).format(value || 0);
+ChartJS.register(
+  ArcElement,
+  Tooltip,
+  Legend,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title
+);
 
-      const initialAccounts = [
-        { id: 1, name: "Cash", type: "Cash" },
-        { id: 2, name: "Bank Account", type: "Bank" },
-        { id: 3, name: "UPI", type: "Digital" }
-      ];
+const money = (value) =>
+  new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 2
+  }).format(value || 0);
 
-      const emptyForm = () => ({
-        type: "expense",
-        description: "",
-        amount: "",
-        date: new Date().toISOString().slice(0, 10),
-        category: "Food",
-        account: "Cash",
-        recurring: false
-      });
+const initialAccounts = [
+  { id: 1, name: "Cash", type: "Cash" },
+  { id: 2, name: "Bank Account", type: "Bank" },
+  { id: 3, name: "UPI", type: "Digital" }
+];
 
-      export default function App() {
-        const [currentUser, setCurrentUser] = useState(() => {
-          try {
-            return JSON.parse(localStorage.getItem("expenseUser") || "null");
-          } catch {
-            return null;
-          }
-        });
+const chartColors = [
+  "#6366F1",
+  "#06B6D4",
+  "#F59E0B",
+  "#EC4899",
+  "#10B981",
+  "#8B5CF6",
+  "#EF4444",
+  "#3B82F6",
+  "#F97316",
+  "#14B8A6",
+  "#A855F7"
+];
 
-        function handleLogin(user) {
-          localStorage.setItem("expenseUser", JSON.stringify(user));
-          setCurrentUser(user);
+const emptyForm = () => ({
+  type: "expense",
+  description: "",
+  amount: "",
+  date: new Date().toISOString().slice(0, 10),
+  category: "Food",
+  account: "Cash",
+  recurring: false
+});
+
+export default function App() {
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("expenseUser") || "null");
+    } catch {
+      return null;
+    }
+  });
+
+  function handleLogin(user) {
+    localStorage.setItem("expenseUser", JSON.stringify(user));
+    setCurrentUser(user);
+  }
+
+  function handleLogout() {
+    localStorage.removeItem("expenseUser");
+    setCurrentUser(null);
+    setSection("dashboard");
+  }
+
+  const [transactions, setTransactions] = useState(() =>
+    JSON.parse(localStorage.getItem("transactions") || "[]")
+  );
+
+  const [accounts, setAccounts] = useState(() =>
+    JSON.parse(localStorage.getItem("accounts") || "null") ||
+    initialAccounts
+  );
+
+  const [budget, setBudget] = useState(() =>
+    Number(localStorage.getItem("budget") || 0)
+  );
+
+  const [dark, setDark] = useState(
+    () => localStorage.getItem("darkMode") === "true"
+  );
+
+  const [section, setSection] = useState("dashboard");
+  const [modal, setModal] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState(emptyForm);
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [budgetInput, setBudgetInput] = useState(String(budget));
+
+  // Save data in local storage
+  useEffect(() => {
+    localStorage.setItem("transactions", JSON.stringify(transactions));
+  }, [transactions]);
+
+  useEffect(() => {
+    localStorage.setItem("accounts", JSON.stringify(accounts));
+  }, [accounts]);
+
+  useEffect(() => {
+    localStorage.setItem("budget", String(budget));
+    setBudgetInput(String(budget));
+  }, [budget]);
+
+  useEffect(() => {
+    localStorage.setItem("darkMode", String(dark));
+    document.body.classList.toggle("dark", dark);
+  }, [dark]);
+
+  // Calculate income, expenses and balance
+  const income = transactions
+    .filter((t) => t.type === "income")
+    .reduce((sum, t) => sum + Number(t.amount), 0);
+
+  const expense = transactions
+    .filter((t) => t.type === "expense")
+    .reduce((sum, t) => sum + Number(t.amount), 0);
+
+  const balance = income - expense;
+
+  const savingRate =
+    income > 0 ? Math.max(0, (balance / income) * 100) : 0;
+
+  const remaining = budget - expense;
+
+  const progress =
+    budget > 0 ? Math.min(100, (expense / budget) * 100) : 0;
+
+  // Search and filter transactions
+  const filtered = useMemo(
+    () =>
+      transactions
+        .filter(
+          (t) =>
+            t.description.toLowerCase().includes(search.toLowerCase()) &&
+            (typeFilter === "all" || t.type === typeFilter) &&
+            (categoryFilter === "all" || t.category === categoryFilter)
+        )
+        .sort((a, b) => new Date(b.date) - new Date(a.date)),
+    [transactions, search, typeFilter, categoryFilter]
+  );
+
+  const categories = [...new Set(transactions.map((t) => t.category))];
+
+  const recent = [...transactions]
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 5);
+
+  // Category-wise expense calculation
+  const categoryTotals = {};
+
+  transactions
+    .filter((t) => t.type === "expense")
+    .forEach((t) => {
+      categoryTotals[t.category] =
+        (categoryTotals[t.category] || 0) + Number(t.amount);
+    });
+
+  // Monthly income and expense calculation
+  const monthly = {};
+
+  transactions.forEach((t) => {
+    const key = t.date.slice(0, 7);
+
+    monthly[key] ||= { income: 0, expense: 0 };
+
+    monthly[key][t.type] += Number(t.amount);
+  });
+
+  const months = Object.keys(monthly).sort();
+
+  // Doughnut chart data
+  const doughnutData = {
+    labels: Object.keys(categoryTotals),
+    datasets: [
+      {
+        label: "Expenses",
+        data: Object.values(categoryTotals),
+        backgroundColor: chartColors,
+        borderColor: dark ? "#1e293b" : "#ffffff",
+        borderWidth: 3,
+        hoverOffset: 15,
+        borderRadius: 5,
+        spacing: 3
+      }
+    ]
+  };
+
+  const doughnutOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    cutout: "65%",
+    plugins: {
+      legend: {
+        position: "bottom",
+        labels: {
+          usePointStyle: true,
+          pointStyle: "circle",
+          padding: 18,
+          color: dark ? "#f8fafc" : "#334155"
         }
-
-        function handleLogout() {
-          localStorage.removeItem("expenseUser");
-          setCurrentUser(null);
-          setSection("dashboard");
+      },
+      tooltip: {
+        backgroundColor: "#111827",
+        padding: 12,
+        callbacks: {
+          label: (context) =>
+            `${context.label}: ${money(context.raw)}`
         }
+      }
+    }
+  };
 
-        const [transactions, setTransactions] = useState(() =>
-          JSON.parse(localStorage.getItem("transactions") || "[]")
-        );
+  // Bar chart data
+  const barData = {
+    labels: months,
+    datasets: [
+      {
+        label: "Income",
+        data: months.map((m) => monthly[m].income),
+        backgroundColor: "#10B981",
+        hoverBackgroundColor: "#059669",
+        borderRadius: 8,
+        borderSkipped: false
+      },
+      {
+        label: "Expenses",
+        data: months.map((m) => monthly[m].expense),
+        backgroundColor: "#F43F5E",
+        hoverBackgroundColor: "#E11D48",
+        borderRadius: 8,
+        borderSkipped: false
+      }
+    ]
+  };
 
-        const [accounts, setAccounts] = useState(() =>
-          JSON.parse(localStorage.getItem("accounts") || "null") ||
-          initialAccounts
-        );
-
-        const [budget, setBudget] = useState(() =>
-          Number(localStorage.getItem("budget") || 0)
-        );
-
-        const [dark, setDark] = useState(
-          () => localStorage.getItem("darkMode") === "true"
-        );
-
-        const [section, setSection] = useState("dashboard");
-        const [modal, setModal] = useState(false);
-        const [editingId, setEditingId] = useState(null);
-        const [form, setForm] = useState(emptyForm);
-        const [search, setSearch] = useState("");
-        const [typeFilter, setTypeFilter] = useState("all");
-        const [categoryFilter, setCategoryFilter] = useState("all");
-        const [budgetInput, setBudgetInput] = useState(String(budget));
-
-        // Save data in local storage
-        useEffect(() => {
-          localStorage.setItem("transactions", JSON.stringify(transactions));
-        }, [transactions]);
-
-        useEffect(() => {
-          localStorage.setItem("accounts", JSON.stringify(accounts));
-        }, [accounts]);
-
-        useEffect(() => {
-          localStorage.setItem("budget", String(budget));
-          setBudgetInput(String(budget));
-        }, [budget]);
-
-        useEffect(() => {
-          localStorage.setItem("darkMode", String(dark));
-          document.body.classList.toggle("dark", dark);
-        }, [dark]);
-
-        // Calculate income, expenses and balance
-        const income = transactions
-          .filter((t) => t.type === "income")
-          .reduce((sum, t) => sum + Number(t.amount), 0);
-
-        const expense = transactions
-          .filter((t) => t.type === "expense")
-          .reduce((sum, t) => sum + Number(t.amount), 0);
-
-        const balance = income - expense;
-
-        const savingRate =
-          income > 0 ? Math.max(0, (balance / income) * 100) : 0;
-
-        const remaining = budget - expense;
-
-        const progress =
-          budget > 0 ? Math.min(100, (expense / budget) * 100) : 0;
-
-        // Search and filter transactions
-        const filtered = useMemo(
-          () =>
-            transactions
-              .filter(
-                (t) =>
-                  t.description.toLowerCase().includes(search.toLowerCase()) &&
-                  (typeFilter === "all" || t.type === typeFilter) &&
-                  (categoryFilter === "all" || t.category === categoryFilter)
-              )
-              .sort((a, b) => new Date(b.date) - new Date(a.date)),
-          [transactions, search, typeFilter, categoryFilter]
-        );
-
-        const categories = [...new Set(transactions.map((t) => t.category))];
-
-        const recent = [...transactions]
-          .sort((a, b) => new Date(b.date) - new Date(a.date))
-          .slice(0, 5);
-
-        // Category-wise expense calculation
-        const categoryTotals = {};
-
-        transactions
-          .filter((t) => t.type === "expense")
-          .forEach((t) => {
-            categoryTotals[t.category] =
-              (categoryTotals[t.category] || 0) + Number(t.amount);
-          });
-
-        // Monthly income and expense calculation
-        const monthly = {};
-
-        transactions.forEach((t) => {
-          const key = t.date.slice(0, 7);
-
-          monthly[key] ||= { income: 0, expense: 0 };
-
-          monthly[key][t.type] += Number(t.amount);
-        });
-
-        const months = Object.keys(monthly).sort();
-
-        // Open add transaction form
-        function openAdd() {
-          setEditingId(null);
-          setForm(emptyForm());
-          setModal(true);
+  const barOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: {
+      mode: "index",
+      intersect: false
+    },
+    plugins: {
+      legend: {
+        position: "bottom",
+        labels: {
+          usePointStyle: true,
+          padding: 20,
+          color: dark ? "#f8fafc" : "#334155"
         }
-
-        // Open edit transaction form
-        function openEdit(t) {
-          setEditingId(t.id);
-          setForm({ ...t, amount: String(t.amount) });
-          setModal(true);
+      },
+      tooltip: {
+        backgroundColor: "#111827",
+        padding: 12,
+        callbacks: {
+          label: (context) =>
+            `${context.dataset.label}: ${money(context.raw)}`
         }
-
-        // Save transaction
-        function saveTransaction(e) {
-          e.preventDefault();
-
-          const item = {
-            ...form,
-            id: editingId ?? Date.now(),
-            amount: Number(form.amount),
-            recurring: Boolean(form.recurring)
-          };
-
-          if (!item.description.trim() || item.amount <= 0) return;
-
-          setTransactions((old) =>
-            editingId
-              ? old.map((t) => (t.id === editingId ? item : t))
-              : [...old, item]
-          );
-
-          setModal(false);
+      }
+    },
+    scales: {
+      x: {
+        grid: {
+          display: false
+        },
+        ticks: {
+          color: dark ? "#cbd5e1" : "#64748b"
         }
-
-        // Delete transaction
-        function deleteTransaction(id) {
-          if (window.confirm("Delete this transaction?")) {
-            setTransactions((old) => old.filter((t) => t.id !== id));
-          }
+      },
+      y: {
+        beginAtZero: true,
+        grid: {
+          color: dark ? "#334155" : "#e2e8f0"
+        },
+        ticks: {
+          color: dark ? "#cbd5e1" : "#64748b",
+          callback: (value) => money(value)
         }
+      }
+    }
+  };
 
-        // Add account
-        function addAccount() {
-          const name = window.prompt("Enter account name:");
+  // Open add transaction form
+  function openAdd() {
+    setEditingId(null);
+    setForm(emptyForm());
+    setModal(true);
+  }
 
-          if (!name?.trim()) return;
+  // Open edit transaction form
+  function openEdit(t) {
+    setEditingId(t.id);
+    setForm({ ...t, amount: String(t.amount) });
+    setModal(true);
+  }
 
-          const type = window.prompt("Enter account type:", "Bank") || "Other";
+  // Save transaction
+  function saveTransaction(e) {
+    e.preventDefault();
 
-          setAccounts((old) => [
-            ...old,
-            {
-              id: Date.now(),
-              name: name.trim(),
-              type: type.trim()
-            }
-          ]);
-        }
+    const item = {
+      ...form,
+      id: editingId ?? Date.now(),
+      amount: Number(form.amount),
+      recurring: Boolean(form.recurring)
+    };
 
-        // Export transactions as CSV
-        function exportCSV() {
-          if (!transactions.length) {
-            alert("No transactions to export.");
-            return;
-          }
+    if (!item.description.trim() || item.amount <= 0) return;
 
-          const rows = [
-            [
-              "Date",
-              "Description",
-              "Category",
-              "Account",
-              "Type",
-              "Amount",
-              "Recurring"
-            ],
-            ...transactions.map((t) => [
-              t.date,
-              t.description,
-              t.category,
-              t.account,
-              t.type,
-              t.amount,
-              t.recurring ? "Yes" : "No"
-            ])
-          ];
+    setTransactions((old) =>
+      editingId
+        ? old.map((t) => (t.id === editingId ? item : t))
+        : [...old, item]
+    );
 
-          const csv = rows
-            .map((row) =>
-              row
-                .map((v) => `"${String(v).replaceAll('"', '""')}"`)
-                .join(",")
-            )
-            .join("\n");
+    setModal(false);
+  }
 
-          const url = URL.createObjectURL(
-            new Blob([csv], { type: "text/csv;charset=utf-8;" })
-          );
+  // Delete transaction
+  function deleteTransaction(id) {
+    if (window.confirm("Delete this transaction?")) {
+      setTransactions((old) => old.filter((t) => t.id !== id));
+    }
+  }
 
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = "expense-transactions.csv";
-          a.click();
+  // Add account
+  function addAccount() {
+    const name = window.prompt("Enter account name:");
 
-          URL.revokeObjectURL(url);
-        }
+    if (!name?.trim()) return;
 
-        // Reset application data
-        function resetData() {
-          if (
-            confirm(
-              "This will delete all transactions, accounts and budget. Continue?"
-            )
-          ) {
-            setTransactions([]);
-            setAccounts(initialAccounts);
-            setBudget(0);
-          }
-        }
+    const type = window.prompt("Enter account type:", "Bank") || "Other";
 
-        const titles = {
-          dashboard: "Dashboard",
-          transactions: "Transactions",
-          budget: "Budget",
-          accounts: "Accounts",
-          reports: "Reports"
-        };
+    setAccounts((old) => [
+      ...old,
+      {
+        id: Date.now(),
+        name: name.trim(),
+        type: type.trim()
+      }
+    ]);
+  }
 
-        const nav = [
-          ["dashboard", "📊 Dashboard"],
-          ["transactions", "💳 Transactions"],
-          ["budget", "🎯 Budget"],
-          ["accounts", "🏦 Accounts"],
-          ["reports", "📈 Reports"]
-        ];
+  // Export transactions as CSV
+  function exportCSV() {
+    if (!transactions.length) {
+      alert("No transactions to export.");
+      return;
+    }
 
-        if (!currentUser) {
-          return <Login onLogin={handleLogin} />;
-        }
+    const rows = [
+      [
+        "Date",
+        "Description",
+        "Category",
+        "Account",
+        "Type",
+        "Amount",
+        "Recurring"
+      ],
+      ...transactions.map((t) => [
+        t.date,
+        t.description,
+        t.category,
+        t.account,
+        t.type,
+        t.amount,
+        t.recurring ? "Yes" : "No"
+      ])
+    ];
 
-        return (
-          <div className="app">
-            {/* Sidebar */}
-            <aside className="sidebar">
-              <div className="logo">
-                <div className="logo-icon">₹</div>
+    const csv = rows
+      .map((row) =>
+        row
+          .map((v) => `"${String(v).replaceAll('"', '""')}"`)
+          .join(",")
+      )
+      .join("\n");
 
-                <div>
-                  <h2>
-                    Expense<span>Track</span>
-                  </h2>
-                  <small>Finance Manager</small>
+    const url = URL.createObjectURL(
+      new Blob([csv], { type: "text/csv;charset=utf-8;" })
+    );
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "expense-transactions.csv";
+    a.click();
+
+    URL.revokeObjectURL(url);
+  }
+
+  // Reset application data
+  function resetData() {
+    if (
+      confirm(
+        "This will delete all transactions, accounts and budget. Continue?"
+      )
+    ) {
+      setTransactions([]);
+      setAccounts(initialAccounts);
+      setBudget(0);
+    }
+  }
+
+  const titles = {
+    dashboard: "Dashboard",
+    transactions: "Transactions",
+    budget: "Budget",
+    accounts: "Accounts",
+    reports: "Reports"
+  };
+
+  const nav = [
+    ["dashboard", "📊 Dashboard"],
+    ["transactions", "💳 Transactions"],
+    ["budget", "🎯 Budget"],
+    ["accounts", "🏦 Accounts"],
+    ["reports", "📈 Reports"]
+  ];
+
+  if (!currentUser) {
+    return <Login onLogin={handleLogin} />;
+  }
+
+  return (
+    <div className="app">
+      {/* Sidebar */}
+      <aside className="sidebar">
+        <div className="logo">
+          <div className="logo-icon">₹</div>
+
+          <div>
+            <h2>
+              Expense<span>Track</span>
+            </h2>
+            <small>Finance Manager</small>
+          </div>
+        </div>
+
+        <nav>
+          {nav.map(([key, label]) => (
+            <button
+              key={key}
+              className={`nav-item ${section === key ? "active" : ""}`}
+              onClick={() => setSection(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="sidebar-bottom">
+          <button onClick={() => setDark((v) => !v)}>
+            {dark ? "☀️" : "🌙"} Toggle Theme
+          </button>
+
+          <button onClick={exportCSV}>📥 Export CSV</button>
+
+          <button onClick={resetData}>⚠ Reset Data</button>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="main">
+        <header className="header">
+          <div>
+            <h1>{titles[section]}</h1>
+            <p>Manage your finances smartly and efficiently.</p>
+          </div>
+
+          <div className="header-actions">
+            <span className="logged-in-user">
+              Hi, {currentUser.name || currentUser.email}
+            </span>
+
+            <button className="logout-btn" onClick={handleLogout}>
+              Logout
+            </button>
+
+            <button className="add-btn" onClick={openAdd}>
+              + Add Transaction
+            </button>
+          </div>
+        </header>
+
+        {/* Dashboard */}
+        {section === "dashboard" && (
+          <>
+            <div className="summary-grid">
+              <Summary
+                title="Total Income"
+                value={money(income)}
+                icon="💰"
+                kind="income"
+              />
+
+              <Summary
+                title="Total Expenses"
+                value={money(expense)}
+                icon="💸"
+                kind="expense"
+              />
+
+              <Summary
+                title="Balance"
+                value={money(balance)}
+                icon="💳"
+                kind="balance"
+              />
+
+              <Summary
+                title="Savings Rate"
+                value={`${savingRate.toFixed(1)}%`}
+                icon="🎯"
+                kind="saving"
+              />
+            </div>
+
+            <div className="dashboard-grid">
+              <div className="panel chart-panel">
+                <div className="panel-header">
+                  <div>
+                    <h3>Expense by Category</h3>
+                    <p>Where your money goes</p>
+                  </div>
+                </div>
+
+                <div className="chart-container">
+                  {Object.keys(categoryTotals).length ? (
+                    <Doughnut
+                      data={doughnutData}
+                      options={doughnutOptions}
+                    />
+                  ) : (
+                    <Empty>No expense data yet.</Empty>
+                  )}
                 </div>
               </div>
 
-              <nav>
-                {nav.map(([key, label]) => (
-                  <button
-                    key={key}
-                    className={`nav-item ${
-                      section === key ? "active" : ""
-                    }`}
-                    onClick={() => setSection(key)}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </nav>
+              <div className="panel">
+                <div className="panel-header">
+                  <div>
+                    <h3>Budget Overview</h3>
+                    <p>Monthly spending</p>
+                  </div>
+                </div>
 
-              <div className="sidebar-bottom">
-                <button onClick={() => setDark((v) => !v)}>
-                  {dark ? "☀️" : "🌙"} Toggle Theme
+                <BudgetProgress
+                  budget={budget}
+                  expense={expense}
+                  remaining={remaining}
+                  progress={progress}
+                />
+
+                <button
+                  className="secondary-btn"
+                  onClick={() => setSection("budget")}
+                >
+                  Manage Budget
                 </button>
-
-                <button onClick={exportCSV}>📥 Export CSV</button>
-
-                <button onClick={resetData}>⚠ Reset Data</button>
               </div>
-            </aside>
+            </div>
 
-            {/* Main Content */}
-            <main className="main">
-              <header className="header">
+            <div className="panel">
+              <div className="panel-header">
                 <div>
-                  <h1>{titles[section]}</h1>
-                  <p>Manage your finances smartly and efficiently.</p>
+                  <h3>Recent Transactions</h3>
+                  <p>Your latest financial activities</p>
                 </div>
 
-                <div className="header-actions">
-                  <span className="logged-in-user">
-                    Hi, {currentUser.name || currentUser.email}
-                  </span>
-                  <button className="logout-btn" onClick={handleLogout}>
-                    Logout
-                  </button>
-                  <button className="add-btn" onClick={openAdd}>
-                    + Add Transaction
-                  </button>
-                </div>
-              </header>
+                <button
+                  className="text-btn"
+                  onClick={() => setSection("transactions")}
+                >
+                  View All
+                </button>
+              </div>
 
-              {/* Dashboard */}
-              {section === "dashboard" && (
-                <>
-                  <div className="summary-grid">
-                    <Summary
-                      title="Total Income"
-                      value={money(income)}
-                      icon="💰"
-                      kind="income"
-                    />
-
-                    <Summary
-                      title="Total Expenses"
-                      value={money(expense)}
-                      icon="💸"
-                      kind="expense"
-                    />
-
-                    <Summary
-                      title="Balance"
-                      value={money(balance)}
-                      icon="💳"
-                      kind="balance"
-                    />
-
-                    <Summary
-                      title="Savings Rate"
-                      value={`${savingRate.toFixed(1)}%`}
-                      icon="🎯"
-                      kind="saving"
-                    />
-                  </div>
-
-                  <div className="dashboard-grid">
-                    <div className="panel chart-panel">
-                      <div className="panel-header">
-                        <div>
-                          <h3>Expense by Category</h3>
-                          <p>Where your money goes</p>
-                        </div>
-                      </div>
-
-                      <div className="chart-container">
-                        {Object.keys(categoryTotals).length ? (
-                          <Doughnut
-                            data={{
-                              labels: Object.keys(categoryTotals),
-                              datasets: [
-                                {
-                                  data: Object.values(categoryTotals)
-                                }
-                              ]
-                            }}
-                            options={{
-                              responsive: true,
-                              maintainAspectRatio: false,
-                              plugins: {
-                                legend: { position: "bottom" }
-                              }
-                            }}
-                          />
-                        ) : (
-                          <Empty>No expense data yet.</Empty>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="panel">
-                      <div className="panel-header">
-                        <div>
-                          <h3>Budget Overview</h3>
-                          <p>Monthly spending</p>
-                        </div>
-                      </div>
-
-                      <BudgetProgress
-                        budget={budget}
-                        expense={expense}
-                        remaining={remaining}
-                        progress={progress}
-                      />
-
-                      <button
-                        className="secondary-btn"
-                        onClick={() => setSection("budget")}
-                      >
-                        Manage Budget
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="panel">
-                    <div className="panel-header">
-                      <div>
-                        <h3>Recent Transactions</h3>
-                        <p>Your latest financial activities</p>
-                      </div>
-
-                      <button
-                        className="text-btn"
-                        onClick={() => setSection("transactions")}
-                      >
-                        View All
-                      </button>
-                    </div>
-
-                    {recent.length ? (
-                      recent.map((t) => (
-                        <TransactionRow key={t.id} item={t} />
-                      ))
-                    ) : (
-                      <Empty>No transactions yet.</Empty>
-                    )}
-                  </div>
-                </>
+              {recent.length ? (
+                recent.map((t) => (
+                  <TransactionRow key={t.id} item={t} />
+                ))
+              ) : (
+                <Empty>No transactions yet.</Empty>
               )}
+            </div>
+          </>
+        )}
 
-              {/* Transactions */}
-              {section === "transactions" && (
-                <div className="panel">
-                  <div className="filter-bar">
-                    <input
-                      placeholder="🔍 Search transactions..."
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                    />
+        {/* Transactions */}
+        {section === "transactions" && (
+          <div className="panel">
+            <div className="filter-bar">
+              <input
+                placeholder="🔍 Search transactions..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
 
-                    <select
-                      value={typeFilter}
-                      onChange={(e) => setTypeFilter(e.target.value)}
-                    >
-                      <option value="all">All Types</option>
-                      <option value="income">Income</option>
-                      <option value="expense">Expense</option>
-                    </select>
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+              >
+                <option value="all">All Types</option>
+                <option value="income">Income</option>
+                <option value="expense">Expense</option>
+              </select>
 
-                    <select
-                      value={categoryFilter}
-                      onChange={(e) => setCategoryFilter(e.target.value)}
-                    >
-                      <option value="all">All Categories</option>
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+              >
+                <option value="all">All Categories</option>
 
-                      {categories.map((c) => (
-                        <option key={c}>{c}</option>
-                      ))}
-                    </select>
-                  </div>
+                {categories.map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+            </div>
 
-                  <div className="table-container">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Date</th>
-                          <th>Description</th>
-                          <th>Category</th>
-                          <th>Account</th>
-                          <th>Type</th>
-                          <th>Amount</th>
-                          <th>Action</th>
-                        </tr>
-                      </thead>
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Description</th>
+                    <th>Category</th>
+                    <th>Account</th>
+                    <th>Type</th>
+                    <th>Amount</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
 
-                      <tbody>
-                        {filtered.length ? (
-                          filtered.map((t) => (
-                            <tr key={t.id}>
-                              <td>{t.date}</td>
+                <tbody>
+                  {filtered.length ? (
+                    filtered.map((t) => (
+                      <tr key={t.id}>
+                        <td>{t.date}</td>
 
-                              <td>
-                                <strong>{t.description}</strong>
-                                {t.recurring && <small> 🔁 Recurring</small>}
-                              </td>
+                        <td>
+                          <strong>{t.description}</strong>
+                          {t.recurring && <small> 🔁 Recurring</small>}
+                        </td>
 
-                              <td>
-                                <span className="category-tag">
-                                  {t.category}
-                                </span>
-                              </td>
+                        <td>
+                          <span className="category-tag">
+                            {t.category}
+                          </span>
+                        </td>
 
-                              <td>{t.account}</td>
-                              <td>{t.type}</td>
+                        <td>{t.account}</td>
+                        <td>{t.type}</td>
 
-                              <td
-                                className={
-                                  t.type === "income"
-                                    ? "income-text"
-                                    : "expense-text"
-                                }
-                              >
-                                {t.type === "income" ? "+" : "-"}
-                                {money(t.amount)}
-                              </td>
-
-                              <td>
-                                <button
-                                  className="action-btn"
-                                  onClick={() => openEdit(t)}
-                                >
-                                  ✏️
-                                </button>
-
-                                <button
-                                  className="action-btn"
-                                  onClick={() => deleteTransaction(t.id)}
-                                >
-                                  🗑️
-                                </button>
-                              </td>
-                            </tr>
-                          ))
-                        ) : (
-                          <tr>
-                            <td colSpan="7">
-                              <Empty>No transactions found.</Empty>
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* Budget */}
-              {section === "budget" && (
-                <div className="budget-layout">
-                  <div className="panel">
-                    <h3>Monthly Budget</h3>
-                    <p>Set your spending limit for the month.</p>
-
-                    <div className="form-group">
-                      <label>Budget Amount</label>
-
-                      <input
-                        type="number"
-                        min="0"
-                        value={budgetInput}
-                        placeholder="Enter budget"
-                        onChange={(e) => setBudgetInput(e.target.value)}
-                      />
-                    </div>
-
-                    <button
-                      className="add-btn"
-                      onClick={() => {
-                        const n = Number(budgetInput);
-
-                        if (n < 0) {
-                          return alert("Budget cannot be negative.");
-                        }
-
-                        setBudget(n);
-                        alert("Budget saved successfully.");
-                      }}
-                    >
-                      Save Budget
-                    </button>
-                  </div>
-
-                  <div className="panel">
-                    <h3>Budget Status</h3>
-
-                    <div className="big-number">{money(budget)}</div>
-
-                    <BudgetProgress
-                      budget={budget}
-                      expense={expense}
-                      remaining={remaining}
-                      progress={progress}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Accounts */}
-              {section === "accounts" && (
-                <div className="panel">
-                  <div className="panel-header">
-                    <div>
-                      <h3>Accounts</h3>
-                      <p>Track money across multiple accounts.</p>
-                    </div>
-
-                    <button className="add-btn" onClick={addAccount}>
-                      + Add Account
-                    </button>
-                  </div>
-
-                  <div className="accounts-grid">
-                    {accounts.map((a) => {
-                      const total = transactions
-                        .filter((t) => t.account === a.name)
-                        .reduce(
-                          (s, t) =>
-                            s +
-                            (t.type === "income" ? 1 : -1) *
-                              Number(t.amount),
-                          0
-                        );
-
-                      return (
-                        <div className="account-card" key={a.id}>
-                          <h4>{a.name}</h4>
-                          <p>{a.type}</p>
-                          <div className="account-balance">
-                            {money(total)}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Reports */}
-              {section === "reports" && (
-                <div className="panel">
-                  <div className="panel-header">
-                    <div>
-                      <h3>Financial Reports</h3>
-                      <p>Analyze your financial activity.</p>
-                    </div>
-                  </div>
-
-                  <div className="chart-container large-chart">
-                    {months.length ? (
-                      <Bar
-                        data={{
-                          labels: months,
-                          datasets: [
-                            {
-                              label: "Income",
-                              data: months.map((m) => monthly[m].income)
-                            },
-                            {
-                              label: "Expenses",
-                              data: months.map((m) => monthly[m].expense)
-                            }
-                          ]
-                        }}
-                        options={{
-                          responsive: true,
-                          maintainAspectRatio: false,
-                          plugins: {
-                            legend: { position: "bottom" }
+                        <td
+                          className={
+                            t.type === "income"
+                              ? "income-text"
+                              : "expense-text"
                           }
-                        }}
-                      />
-                    ) : (
-                      <Empty>No report data yet.</Empty>
-                    )}
-                  </div>
-                </div>
-              )}
-            </main>
+                        >
+                          {t.type === "income" ? "+" : "-"}
+                          {money(t.amount)}
+                        </td>
 
-            {/* Add / Edit Transaction Modal */}
-            {modal && (
-              <div
-                className="modal show"
-                onMouseDown={(e) => {
-                  if (e.target === e.currentTarget) {
-                    setModal(false);
+                        <td>
+                          <button
+                            className="action-btn"
+                            onClick={() => openEdit(t)}
+                          >
+                            ✏️
+                          </button>
+
+                          <button
+                            className="action-btn"
+                            onClick={() => deleteTransaction(t.id)}
+                          >
+                            🗑️
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="7">
+                        <Empty>No transactions found.</Empty>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Budget */}
+        {section === "budget" && (
+          <div className="budget-layout">
+            <div className="panel">
+              <h3>Monthly Budget</h3>
+              <p>Set your spending limit for the month.</p>
+
+              <div className="form-group">
+                <label>Budget Amount</label>
+
+                <input
+                  type="number"
+                  min="0"
+                  value={budgetInput}
+                  placeholder="Enter budget"
+                  onChange={(e) => setBudgetInput(e.target.value)}
+                />
+              </div>
+
+              <button
+                className="add-btn"
+                onClick={() => {
+                  const n = Number(budgetInput);
+
+                  if (n < 0) {
+                    return alert("Budget cannot be negative.");
                   }
+
+                  setBudget(n);
+                  alert("Budget saved successfully.");
                 }}
               >
-                <div className="modal-content">
-                  <div className="modal-header">
-                    <h2>
-                      {editingId ? "Edit Transaction" : "Add Transaction"}
-                    </h2>
+                Save Budget
+              </button>
+            </div>
 
-                    <button
-                      className="close-btn"
-                      onClick={() => setModal(false)}
-                    >
-                      ×
-                    </button>
+            <div className="panel">
+              <h3>Budget Status</h3>
+
+              <div className="big-number">{money(budget)}</div>
+
+              <BudgetProgress
+                budget={budget}
+                expense={expense}
+                remaining={remaining}
+                progress={progress}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Accounts */}
+        {section === "accounts" && (
+          <div className="panel">
+            <div className="panel-header">
+              <div>
+                <h3>Accounts</h3>
+                <p>Track money across multiple accounts.</p>
+              </div>
+
+              <button className="add-btn" onClick={addAccount}>
+                + Add Account
+              </button>
+            </div>
+
+            <div className="accounts-grid">
+              {accounts.map((a) => {
+                const total = transactions
+                  .filter((t) => t.account === a.name)
+                  .reduce(
+                    (s, t) =>
+                      s +
+                      (t.type === "income" ? 1 : -1) *
+                        Number(t.amount),
+                    0
+                  );
+
+                return (
+                  <div className="account-card" key={a.id}>
+                    <h4>{a.name}</h4>
+                    <p>{a.type}</p>
+                    <div className="account-balance">
+                      {money(total)}
+                    </div>
                   </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
-                  <form onSubmit={saveTransaction}>
-                    <div className="form-group">
-                      <label>Transaction Type</label>
+        {/* Reports */}
+        {section === "reports" && (
+          <div className="panel">
+            <div className="panel-header">
+              <div>
+                <h3>Financial Reports</h3>
+                <p>Analyze your financial activity.</p>
+              </div>
+            </div>
 
-                      <select
-                        value={form.type}
-                        onChange={(e) =>
-                          setForm({ ...form, type: e.target.value })
-                        }
-                      >
-                        <option value="expense">Expense</option>
-                        <option value="income">Income</option>
-                      </select>
-                    </div>
+            <div className="chart-container large-chart">
+              {months.length ? (
+                <Bar data={barData} options={barOptions} />
+              ) : (
+                <Empty>No report data yet.</Empty>
+              )}
+            </div>
+          </div>
+        )}
+      </main>
 
-                    <div className="form-group">
-                      <label>Description</label>
+      {/* Add / Edit Transaction Modal */}
+      {modal && (
+        <div
+          className="modal show"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              setModal(false);
+            }
+          }}
+        >
+          <div className="modal-content">
+            <div className="modal-header">
+              <h2>
+                {editingId ? "Edit Transaction" : "Add Transaction"}
+              </h2>
 
-                      <input
-                        required
-                        value={form.description}
-                        placeholder="e.g. Grocery shopping"
-                        onChange={(e) =>
-                          setForm({
-                            ...form,
-                            description: e.target.value
-                          })
-                        }
-                      />
-                    </div>
+              <button
+                className="close-btn"
+                onClick={() => setModal(false)}
+              >
+                ×
+              </button>
+            </div>
 
-                    <div className="form-row">
-                      <div className="form-group">
-                        <label>Amount</label>
+            <form onSubmit={saveTransaction}>
+              <div className="form-group">
+                <label>Transaction Type</label>
 
-                        <input
-                          required
-                          type="number"
-                          min="0.01"
-                          step="0.01"
-                          value={form.amount}
-                          onChange={(e) =>
-                            setForm({ ...form, amount: e.target.value })
-                          }
-                        />
-                      </div>
+                <select
+                  value={form.type}
+                  onChange={(e) =>
+                    setForm({ ...form, type: e.target.value })
+                  }
+                >
+                  <option value="expense">Expense</option>
+                  <option value="income">Income</option>
+                </select>
+              </div>
 
-                      <div className="form-group">
-                        <label>Date</label>
+              <div className="form-group">
+                <label>Description</label>
 
-                        <input
-                          required
-                          type="date"
-                          value={form.date}
-                          onChange={(e) =>
-                            setForm({ ...form, date: e.target.value })
-                          }
-                        />
-                      </div>
-                    </div>
+                <input
+                  required
+                  value={form.description}
+                  placeholder="e.g. Grocery shopping"
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      description: e.target.value
+                    })
+                  }
+                />
+              </div>
 
-                    <div className="form-row">
-                      <div className="form-group">
-                        <label>Category</label>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Amount</label>
 
-                        <select
-                          value={form.category}
-                          onChange={(e) =>
-                            setForm({ ...form, category: e.target.value })
-                          }
-                        >
-                          {[
-                            "Food",
-                            "Transport",
-                            "Shopping",
-                            "Bills",
-                            "Entertainment",
-                            "Health",
-                            "Education",
-                            "Salary",
-                            "Freelance",
-                            "Investment",
-                            "Other"
-                          ].map((c) => (
-                            <option key={c}>{c}</option>
-                          ))}
-                        </select>
-                      </div>
+                  <input
+                    required
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={form.amount}
+                    onChange={(e) =>
+                      setForm({ ...form, amount: e.target.value })
+                    }
+                  />
+                </div>
 
-                      <div className="form-group">
-                        <label>Account</label>
+                <div className="form-group">
+                  <label>Date</label>
 
-                        <select
-                          value={form.account}
-                          onChange={(e) =>
-                            setForm({ ...form, account: e.target.value })
-                          }
-                        >
-                          {accounts.map((a) => (
-                            <option key={a.id}>{a.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="form-group checkbox-group">
-                      <input
-                        type="checkbox"
-                        checked={form.recurring}
-                        onChange={(e) =>
-                          setForm({
-                            ...form,
-                            recurring: e.target.checked
-                          })
-                        }
-                      />
-
-                      <label>Recurring transaction</label>
-                    </div>
-
-                    <div className="modal-actions">
-                      <button
-                        type="button"
-                        className="secondary-btn"
-                        onClick={() => setModal(false)}
-                      >
-                        Cancel
-                      </button>
-
-                      <button type="submit" className="add-btn">
-                        Save Transaction
-                      </button>
-                    </div>
-                  </form>
+                  <input
+                    required
+                    type="date"
+                    value={form.date}
+                    onChange={(e) =>
+                      setForm({ ...form, date: e.target.value })
+                    }
+                  />
                 </div>
               </div>
-            )}
 
-            <div className="developer-tag">
-              Designed and Developed by <strong>Harshal Balla</strong>
-            </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Category</label>
+
+                  <select
+                    value={form.category}
+                    onChange={(e) =>
+                      setForm({ ...form, category: e.target.value })
+                    }
+                  >
+                    {[
+                      "Food",
+                      "Transport",
+                      "Shopping",
+                      "Bills",
+                      "Entertainment",
+                      "Health",
+                      "Education",
+                      "Salary",
+                      "Freelance",
+                      "Investment",
+                      "Other"
+                    ].map((c) => (
+                      <option key={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Account</label>
+
+                  <select
+                    value={form.account}
+                    onChange={(e) =>
+                      setForm({ ...form, account: e.target.value })
+                    }
+                  >
+                    {accounts.map((a) => (
+                      <option key={a.id}>{a.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-group checkbox-group">
+                <input
+                  type="checkbox"
+                  checked={form.recurring}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      recurring: e.target.checked
+                    })
+                  }
+                />
+
+                <label>Recurring transaction</label>
+              </div>
+
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  onClick={() => setModal(false)}
+                >
+                  Cancel
+                </button>
+
+                <button type="submit" className="add-btn">
+                  Save Transaction
+                </button>
+              </div>
+            </form>
           </div>
-        );
-      }
+        </div>
+      )}
 
-      // Summary card component
-      function Summary({ title, value, icon, kind }) {
-        return (
-          <div className={`summary-card ${kind}`}>
-            <div>
-              <p>{title}</p>
-              <h2>{value}</h2>
-            </div>
+      <div className="developer-tag">
+        Designed and Developed by <strong>Harshal Balla</strong>
+      </div>
+    </div>
+  );
+}
 
-            <div className="card-icon">{icon}</div>
-          </div>
-        );
-      }
+// Summary card component
+function Summary({ title, value, icon, kind }) {
+  return (
+    <div className={`summary-card ${kind}`}>
+      <div>
+        <p>{title}</p>
+        <h2>{value}</h2>
+      </div>
 
-      // Empty message component
-      function Empty({ children }) {
-        return <div className="empty">{children}</div>;
-      }
+      <div className="card-icon">{icon}</div>
+    </div>
+  );
+}
 
-      // Transaction row component
-      function TransactionRow({ item: t }) {
-        return (
-          <div className="transaction-row">
-            <div>
-              <strong>{t.description}</strong>
-              <small>
-                {t.date} • {t.category}
-              </small>
-            </div>
+// Empty message component
+function Empty({ children }) {
+  return <div className="empty">{children}</div>;
+}
 
-            <strong
-              className={
-                t.type === "income" ? "income-text" : "expense-text"
-              }
-            >
-              {t.type === "income" ? "+" : "-"}
-              {money(t.amount)}
-            </strong>
-          </div>
-        );
-      }
+// Transaction row component
+function TransactionRow({ item: t }) {
+  return (
+    <div className="transaction-row">
+      <div>
+        <strong>{t.description}</strong>
+        <small>
+          {t.date} • {t.category}
+        </small>
+      </div>
 
-      // Budget progress component
-      function BudgetProgress({
-        budget,
-        expense,
-        remaining,
-        progress
-      }) {
-        return (
-          <div className="budget-box">
-            <div className="budget-top">
-              <span>Monthly Budget</span>
-              <strong>{money(budget)}</strong>
-            </div>
+      <strong
+        className={
+          t.type === "income" ? "income-text" : "expense-text"
+        }
+      >
+        {t.type === "income" ? "+" : "-"}
+        {money(t.amount)}
+      </strong>
+    </div>
+  );
+}
 
-            <div className="progress">
-              <div style={{ width: `${progress}%` }} />
-            </div>
+// Budget progress component
+function BudgetProgress({
+  budget,
+  expense,
+  remaining,
+  progress
+}) {
+  return (
+    <div className="budget-box">
+      <div className="budget-top">
+        <span>Monthly Budget</span>
+        <strong>{money(budget)}</strong>
+      </div>
 
-            <div className="budget-info">
-              <span>Spent: {money(expense)}</span>
-              <span>Remaining: {money(remaining)}</span>
-            </div>
-          </div>
-        );
-      }
+      <div className="progress">
+        <div style={{ width: `${progress}%` }} />
+      </div>
+
+      <div className="budget-info">
+        <span>Spent: {money(expense)}</span>
+        <span>Remaining: {money(remaining)}</span>
+      </div>
+    </div>
+  );
+}
